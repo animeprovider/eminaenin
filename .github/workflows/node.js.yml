@@ -36,6 +36,7 @@ jobs:
         run: node main.js
       - name: Commit changes
         run: |
+          git remote remove origin
           git remote add origin https://${{ secrets.TOKEN }}@github.com/${{ secrets.USERNAME }}/eminaenin
           git commit -a -m "Add changes"
       - name: Push changes
