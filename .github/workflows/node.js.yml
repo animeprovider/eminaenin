@@ -34,9 +34,13 @@ jobs:
         run: npm install
       - name: Run main.js
         run: node main.js
-        
+      - name: Commit changes
+        run: |
+          git add .
+          git commit -m "Update file using main.js"
+          git push
+          
       - name: Purge Commit History
-        if: steps.verify_diff.outputs.new_translations_exist == 'true'
         run: |
           git checkout --orphan latest_branch
           git add -A && git commit -am "syek!"
