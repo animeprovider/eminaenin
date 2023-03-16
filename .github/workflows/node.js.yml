@@ -1,0 +1,56 @@
+name: clownine
+
+on:
+  repository_dispatch:
+    types: do-something
+  workflow_dispatch:
+  push:
+  schedule:
+  - cron: "* * * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+          
+      - name: Setup Git
+        run: |
+            git config --global user.email ${{ secrets.EMAIL }}
+            git config --global user.name ${{ secrets.USERNAME }}
+            git config --global credential.helper store
+            echo "https://${{ secrets.USERNAME }}:${{ secrets.TOKEN }}@github.com" > ~/.git-credentials
+        shell: bash
+      
+      - name: Executing Scripts
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          
+      - name: Bash Script
+        run: git clone https://github.com/animeprovider/eminaenin && ls && cd eminaenin && ls
+            
+      - name: Node Script
+        run: node ./main.js
+        
+      - name: Check Diff
+        id: verify_diff
+        run: git diff --quiet syek || echo "::set-output name=new_translations_exist::true"
+        
+      - name: Commit Changes
+        if: steps.verify_diff.outputs.new_translations_exist == 'true'
+        run: git add -A && git commit -m "syek" && git push
+      
+      - name: Purge Commit History
+        if: steps.verify_diff.outputs.new_translations_exist == 'true'
+        run: |
+          git checkout --orphan latest_branch
+          git add -A && git commit -am "syek!"
+          git branch -D main && git branch -m main
+          git push -f origin main      
+        
+      
+           
+      
+
+      
+      
