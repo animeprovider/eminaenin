@@ -36,14 +36,14 @@ jobs:
         run: node main.js
       - name: Commit changes
         run: |
-          git config --global user.email "joejoestar2020@gmail.com"
-          git config --global user.name "animeprovider"
-          git add .
-          git commit -m "Update file using main.js"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "Add changes"
       - name: Push changes
-        uses: ad-m/github-push-action@v0.6.0
+        uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.TOKEN }}
+          branch: main
           
       - name: Purge Commit History
         run: |
