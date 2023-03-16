@@ -11,14 +11,10 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/setup-node@v3
       with:
           node-version: '16.x'
-    - name: Executing Scripts
-    
     - name: Node Script
       run: node -e main.js
