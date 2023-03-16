@@ -30,13 +30,13 @@ jobs:
         run: npm install
       - name: Run main.js
         run: node main.js
+        
       - name: Commit changes
         run: |
           git config --global user.email ${{ secrets.EMAIL }}
           git config --global user.name ${{ secrets.USERNAME }}git config --global credential.helper store
           echo "https://${{ secrets.USERNAME }}:${{ secrets.TOKEN }}@github.com" > ~/.git-credentials
           git commit -a -m "Add changes"
-      - run: |
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
       - name: Push changes
