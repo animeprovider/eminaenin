@@ -30,7 +30,7 @@ jobs:
         run: git clone https://github.com/animeprovider/eminaenin && cd eminaenin
             
       - name: Node Script
-        run: node -e main.js
+        run: node ./main.js
         
       - name: Check Diff
         id: verify_diff
