@@ -4,9 +4,7 @@ const {parse} = require("@babel/parser");
 const {default: traverse} = require("@babel/traverse");
 const types = require("@babel/types");
 const prefixes = require("./prefixes");
-const {ObjectProperty} = require("@babel/types");
 const assert = require("assert");
-const {ReferencedMemberExpression} = require("@babel/traverse/lib/path/lib/virtual-types");
 const beautify =require("js-beautify").js;
 const generate = require('@babel/generator').default
 
@@ -15,177 +13,277 @@ let fileName = "./scripts.js"
 // fileName = "./rabbitstream.js"
 // fileName = "./dokicloud.js"
 const outputFilename=fileName.replace(".js",".cleaned.js")
-let script = fs.readFileSync(fileName).toString()
 
-let ast = parse(script);
+const axios = require('axios');
+// console.log(axios)
+// console.log(axios.get('https://9anime.pl/home').then(response => response.status))
+axios.get('https://9anime.pl/home')
+    .then(res => {
+        axios.get(/https:\/\/s2\.bunnycdn\.ru\/assets\/_9anime\/min\/all\.js\?[^"]+/gm.exec(res.data)[0])
+            .then(response => {
+                // let script = response.data
+                let script = fs.readFileSync(fileName).toString()
+                let ast = parse(script);
 
 //region finding the decrypt functions and arrays
-console.log('\x1b[31m%s\x1b[0m','Finding decryption functions...')
+                console.log('\x1b[31m%s\x1b[0m','Finding decryption functions...')
 
-let decryptArrayBindings=[]
-let importantThings = []
-let decryptFunctionBindings=[]
-traverse(ast, {
-    FunctionDeclaration(path) {
-        const {node,scope} = path
-        let name= node.id.name
-        let isDecryptFunction=false
-        let isKeyArray=false
-        path.traverse({
-            ArrayExpression(childPath){
-                if(childPath.node.elements.length>10 &&
-                    types.isVariableDeclaration(childPath.parentPath.parentPath)&&
-                    types.isBlockStatement(childPath.parentPath.parentPath.parentPath)
-                ){
-                    const siblings=childPath.parentPath.parentPath.getAllNextSiblings()
-                    if(types.isExpressionStatement(siblings[0])&&types.isReturnStatement(siblings[1])&&siblings.length===2){
-                        eval(path.toString())
-                        console.log('Found Decrypt Array Function',name)
-                        decryptArrayBindings.push(scope.getBinding(node.id.name))
-                        childPath.stop()
+                let decryptArrayBindings=[]
+                let importantThings = []
+                let decryptFunctionBindings=[]
+                traverse(ast, {
+                    FunctionDeclaration(path) {
+                        const {node,scope} = path
+                        let name= node.id.name
+                        let isDecryptFunction=false
+                        let isKeyArray=false
+                        path.traverse({
+                            ArrayExpression(childPath){
+                                if(childPath.node.elements.length>10 &&
+                                    types.isVariableDeclaration(childPath.parentPath.parentPath)&&
+                                    types.isBlockStatement(childPath.parentPath.parentPath.parentPath)
+                                ){
+                                    const siblings=childPath.parentPath.parentPath.getAllNextSiblings()
+                                    if(types.isExpressionStatement(siblings[0])&&types.isReturnStatement(siblings[1])&&siblings.length===2){
+                                        eval(path.toString())
+                                        console.log('Found Decrypt Array Function',name)
+                                        decryptArrayBindings.push(scope.getBinding(node.id.name))
+                                        childPath.stop()
+                                    }
+                                }
+
+                            },
+                        })
+                        if(isDecryptFunction===false && types.isProgram(path.parentPath)){
+                            // console.log(name)
+                            importantThings.push(script.substring(node.start,node.end))
+                        }
+                    },
+                    VariableDeclarator(path){
+                        if(types.isVariableDeclaration(path.parentPath) &&
+                            types.isProgram(path.parentPath.parentPath)
+                        ){
+                            if(types.isIdentifier(path.node.init)){
+                                // console.log(path.toString())
+                                importantThings.push('var '+path.toString())
+
+                            }
+                            else if(types.isCallExpression(path.node.init)){
+                                if(types.isFunctionExpression(path.node.init.callee)){
+                                    // console.log(path.toString())
+                                    // console.log(path.node.init.callee)
+                                    importantThings.push('var '+path.toString())
+                                }
+                            }
+                        }
                     }
-                }
+                });
+                console.log('\x1b[31m%s\x1b[0m','Rotating decryption arrays...')
+                var rotators = []
+                decryptArrayBindings.forEach((binding)=>{
+                    binding.referencePaths.forEach((refPath)=>{
+                        if(types.isCallExpression(refPath.parentPath)){
+                            const callExpr=refPath.parentPath
+                            const callExprArgs=callExpr.node.arguments
+                            if(callExprArgs[0]===refPath.node&&(types.isBinaryExpression(callExprArgs[1])||types.isNumericLiteral(callExprArgs[1]))&&callExprArgs.length===2){
+                                console.log("Found Decrypt Array Rotator!")
+                                rotators.push('('+refPath.parentPath.toString()+')');
+                                refPath.parentPath.remove()
+                            }else{
+                                if(!refPath.node)return
+                                if(!types.isReturnStatement(refPath.parentPath.parentPath)&&refPath.getFunctionParent().node.id.name!==refPath.node.id){
+                                    // console.log(refPath.parentPath.parentPath.type)
+                                    const functionParent=refPath.getFunctionParent()
+                                    const binding=functionParent.scope.getBinding(functionParent.node.id.name)
+                                    if(!decryptFunctionBindings.includes(binding)){
+                                        importantThings.push(script.substring(functionParent.node.start,functionParent.node.end));
+                                        console.log('Found Decrypt Function',functionParent.node.id.name)
+                                        decryptFunctionBindings.push(binding)
+                                    }
+                                }else{
+                                }
+                            }
 
-            },
-        })
-        if(isDecryptFunction===false && types.isProgram(path.parentPath)){
-            // console.log(name)
-            importantThings.push(script.substring(node.start,node.end))
-        }
-    },
-    VariableDeclarator(path){
-        if(types.isVariableDeclaration(path.parentPath) &&
-            types.isProgram(path.parentPath.parentPath)
-        ){
-            if(types.isIdentifier(path.node.init)){
-                // console.log(path.toString())
-                importantThings.push('var '+path.toString())
+                        }
+                    })
+                    binding.path.remove()
+                })
+                eval(importantThings.join(';'))
+                eval(rotators.join(';'))
+                console.log('\x1b[31m%s\x1b[0m','Finding decryption decryption function usages...')
 
-            }
-            else if(types.isCallExpression(path.node.init)){
-                if(types.isFunctionExpression(path.node.init.callee)){
-                    // console.log(path.toString())
-                    // console.log(path.node.init.callee)
-                    importantThings.push('var '+path.toString())
-                }
-            }
-        }
-    }
-});
-console.log('\x1b[31m%s\x1b[0m','Rotating decryption arrays...')
-var rotators = []
-decryptArrayBindings.forEach((binding)=>{
-    binding.referencePaths.forEach((refPath)=>{
-        if(types.isCallExpression(refPath.parentPath)){
-            const callExpr=refPath.parentPath
-            const callExprArgs=callExpr.node.arguments
-            if(callExprArgs[0]===refPath.node&&(types.isBinaryExpression(callExprArgs[1])||types.isNumericLiteral(callExprArgs[1]))&&callExprArgs.length===2){
-                console.log("Found Decrypt Array Rotator!")
-                rotators.push('('+refPath.parentPath.toString()+')');
-                refPath.parentPath.remove()
-            }else{
-                if(!refPath.node)return
-                if(!types.isReturnStatement(refPath.parentPath.parentPath)&&refPath.getFunctionParent().node.id.name!==refPath.node.id){
-                    // console.log(refPath.parentPath.parentPath.type)
-                    const functionParent=refPath.getFunctionParent()
-                    const binding=functionParent.scope.getBinding(functionParent.node.id.name)
-                    if(!decryptFunctionBindings.includes(binding)){
-                        importantThings.push(script.substring(functionParent.node.start,functionParent.node.end));
-                        console.log('Found Decrypt Function',functionParent.node.id.name)
-                        decryptFunctionBindings.push(binding)
+                let unusedBindings=[]
+                decryptFunctionBindings.forEach(function(binding){
+                    if(binding.path.node===null)return;
+                    binding.referencePaths.forEach(function(refPath){
+                        checkReference(refPath,binding.path.node.id.name)
+                    })
+                    binding.path.remove()
+                })
+                function checkReference(refPath,decryptFuncName,verbose=false){
+                    if(types.isCallExpression(refPath.parentPath)){
+                        if(!refPath.parentPath.node.arguments.every(arg=>!types.isIdentifier(arg)))return
+                        refPath.parentPath.node.callee.name=decryptFuncName
+                        try{
+                            const evaluated=eval(refPath.parentPath.toString())
+                            if(verbose)console.log("Evaluated decrypt call expression", refPath.parentPath.toString(),"to",evaluated)
+                            refPath.parentPath.replaceWith(types.StringLiteral(evaluated))
+                        }catch (e){
+                            console.log('Failed to evaluate',refPath.parentPath.parentPath.toString())
+                        }
                     }
-                }else{
+                    else if(types.isVariableDeclarator(refPath.parentPath)){
+                        let binding = refPath.scope.getBinding(refPath.parentPath.node.id.name)
+                        binding.referencePaths.forEach(function (childRefPath) {
+                            checkReference(childRefPath,decryptFuncName)
+                        })
+                    }
+
                 }
-            }
-
-        }
-    })
-    binding.path.remove()
-})
-eval(importantThings.join(';'))
-eval(rotators.join(';'))
-console.log('\x1b[31m%s\x1b[0m','Finding decryption decryption function usages...')
-
-let unusedBindings=[]
-decryptFunctionBindings.forEach(function(binding){
-    if(binding.path.node===null)return;
-    binding.referencePaths.forEach(function(refPath){
-        checkReference(refPath,binding.path.node.id.name)
-    })
-    binding.path.remove()
-})
-function checkReference(refPath,decryptFuncName,verbose=false){
-    if(types.isCallExpression(refPath.parentPath)){
-        if(!refPath.parentPath.node.arguments.every(arg=>!types.isIdentifier(arg)))return
-        refPath.parentPath.node.callee.name=decryptFuncName
-        try{
-            const evaluated=eval(refPath.parentPath.toString())
-            if(verbose)console.log("Evaluated decrypt call expression", refPath.parentPath.toString(),"to",evaluated)
-            refPath.parentPath.replaceWith(types.StringLiteral(evaluated))
-        }catch (e){
-            console.log('Failed to evaluate',refPath.parentPath.parentPath.toString())
-        }
-    }
-    else if(types.isVariableDeclarator(refPath.parentPath)){
-        let binding = refPath.scope.getBinding(refPath.parentPath.node.id.name)
-        binding.referencePaths.forEach(function (childRefPath) {
-            checkReference(childRefPath,decryptFuncName)
-        })
-    }
-
-}
 //endregion
 
-inlineAndEvaluate(ast)
+                inlineAndEvaluate(ast)
 
-inlineObject(ast,true,true)
+                inlineObject(ast,true,true)
 
-inlineAndEvaluate(ast)
+                inlineAndEvaluate(ast)
 
-inlineSimpleFunctions(ast)
-inlineAndEvaluate(ast)
+                inlineSimpleFunctions(ast)
+                inlineAndEvaluate(ast)
 
-traverse(ast,{
-    WhileStatement(path) {
-        let switchNode = path.node.body.body[0];
+                traverse(ast,{
+                    WhileStatement(path) {
+                        let switchNode = path.node.body.body[0];
 
-        if(types.isSwitchStatement(switchNode)){
-            let arrayName = switchNode.discriminant.object.name;
-            let prevSiblings = path.getAllPrevSiblings();
-            let array = []
-            prevSiblings.forEach(pervNode => {
-                if(!pervNode.node.declarations)return
-                let {id, init} = pervNode.node.declarations[0];
-                if (arrayName === id.name) {
-                    let object = init.callee.object.value;
-                    let property = init.callee.property.value;
-                    let argument = init.arguments[0].value;
-                    if(!object)return
-                    array = object[property](argument)
-                }
-                pervNode.remove();
-            })
-            let replace = [];
-            array.forEach(index => {
-                    let consequent = switchNode.cases[index].consequent;
-                    if (types.isContinueStatement(consequent[consequent.length - 1])) {
-                        consequent.pop();
+                        if(types.isSwitchStatement(switchNode)){
+                            let arrayName = switchNode.discriminant.object.name;
+                            let prevSiblings = path.getAllPrevSiblings();
+                            let array = []
+                            prevSiblings.forEach(pervNode => {
+                                if(!pervNode.node.declarations)return
+                                let {id, init} = pervNode.node.declarations[0];
+                                if (arrayName === id.name) {
+                                    let object = init.callee.object.value;
+                                    let property = init.callee.property.value;
+                                    let argument = init.arguments[0].value;
+                                    if(!object)return
+                                    array = object[property](argument)
+                                }
+                                pervNode.remove();
+                            })
+                            let replace = [];
+                            array.forEach(index => {
+                                    let consequent = switchNode.cases[index].consequent;
+                                    if (types.isContinueStatement(consequent[consequent.length - 1])) {
+                                        consequent.pop();
+                                    }
+                                    replace = replace.concat(consequent);
+                                }
+                            );
+                            path.replaceWithMultiple(replace);
+                        }
+                        else{
+                            // console.log(switchNode)
+                        }
                     }
-                    replace = replace.concat(consequent);
-                }
-            );
-            path.replaceWithMultiple(replace);
-        }
-        else{
-            // console.log(switchNode)
+                })
+                removeDeadCode(ast)
+
+                memberLiteralToIdentifier(ast)
+
+
+
+                // createOutput(ast,script,false,false)
+                const output= generate(ast,
+                    {
+                        compact: true,
+                        // retainLines:false,
+                        // retainFunctionParens:false,
+                        minified:true,
+                        concise:true,
+                    }
+                    , script);
+                let obj=getMethod(output.code)
+                fs =require("fs")
+                fs.writeFileSync("secret.json",JSON.stringify(obj))
+
+            })
+            })
+
+// let script = fs.readFileSync(fileName).toString()
+
+
+
+
+
+// createOutput(true,false)
+
+
+
+
+function getMethod(output) {
+
+    const mapFunRegex = /(\w{2}):function \w\(\w\){return \w\.split\(\w+\)\.reverse\(\)\.join\(\w+\)},(\w{2}):function \w\(\w\){return \w\.replace\(\/\[a-zA-Z]\/g,function\(\w\){return String\.fromCharCode\(\(\w<="Z"\?90:122\)>=\(t=t\.charCodeAt\(0\)\+13\)\?\w:\w-26\)}\)},\w{2}:function \w\(\w\){var ([\w\.=,]*?),(\w=\d+);function \w\(\w\){(.*?);for\(var \w=0;\w<\w.length;\w\+\+\){var \w=\w\.charCodeAt\(\w\);if\(!\[]\)\w=0;else\{(.*?)\w\+=String\.fromCharCode\(\w\)}return (.*?)}if\(typeof/gm
+    let alljs=output
+    let g = mapFunRegex.exec(alljs)
+    let srj = g[1]
+    let rot13 = g[2]
+
+    let mod = g[4]
+    let funMap = {}
+    for (let i = 0, vars = g[3].split(","); i < vars.length; i++) {
+        let splitted = vars[i].split("=");
+        if (splitted[1] === "this." + rot13) {
+            funMap[splitted[0]] = "rot13";
+        } else if (splitted[1] === "this." + srj) {
+            funMap[splitted[0]] = "srj";
+        }else{
+            console.log(splitted[1])
+            funMap[splitted[0]] = "encrypt";
         }
     }
-})
-removeDeadCode(ast)
+    let pre = []
+    for (let i = 0, vars = g[5].split(","); i < vars.length; i++) {
+        let splitted = vars[i].split("=");
+        let fun = funMap[splitted[1].split('(')[0]]
+        pre.push(fun)
+    }
 
-memberLiteralToIdentifier(ast)
+    let ifsRegex = /\(\w%\w===(\d)\)\w=\w([+\-*^\/]\d+)/gm
+    let modMap = {}
+    let match;
+    while ((match = ifsRegex.exec(g[6])) !== null) {
+        modMap[match[1]] = match[2]
+    }
+    let post = []
+    for (let i = 0, vars = g[7].split(","); i < vars.length; i++) {
 
-createOutput(true,false)
+        let splitted = vars[i].split('=');
+        // if(typeof(splitted[1]))continue
+
+        if (typeof (splitted[1]) === typeof (undefined)) continue
+        let fun = funMap[splitted[1].split('(')[0]]
+        post.push(fun)
+    }
+    let keys = /\("(\w{16})",\w.{0,200}\("(hlPeNwkncH0fq9so)"/gm.exec(alljs)
+    let encrypt =keys[1]
+    let decrypt = keys[2]
+
+    return {
+        "encrypt":encrypt,
+        "decrypt":decrypt,
+        "mod":mod.split('=')[1],
+        "pre":pre,
+        "modMap":modMap,
+        "post":post
+    }
+}
+
+
+
+
+
+
 
 
 function inlineAndEvaluate(ast){
@@ -509,8 +607,7 @@ function removeDeadCode(ast){
     })
 }
 
-
-function createOutput(exit=true,shouldBeautify=true){
+function createOutput(ast,script,exit=true,shouldBeautify=true){
     let deobfuscated;
     fs =require("fs")
     function writeToFile(filename=outputFilename){
