@@ -18,6 +18,7 @@ jobs:
             git config --global user.email ${{ secrets.EMAIL }}
             git config --global user.name ${{ secrets.USERNAME }}
             git config --global credential.helper store
+             git remote add origin https://${{ secrets.TOKEN }}@github.com/${{ secrets.USERNAME }}/eminaenin
             echo "https://${{ secrets.USERNAME }}:${{ secrets.TOKEN }}@github.com" > ~/.git-credentials
         shell: bash
       
@@ -36,8 +37,6 @@ jobs:
         run: node main.js
       - name: Commit changes
         run: |
-          git config --local user.email ${{ secrets.EMAIL }}
-          git config --local user.name ${{ secrets.USERNAME }}
           git commit -a -m "Add changes"
       - name: Push changes
         uses: ad-m/github-push-action@master
