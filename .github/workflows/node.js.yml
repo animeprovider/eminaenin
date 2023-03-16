@@ -30,9 +30,10 @@ jobs:
         
       - name: Commit changes
         run: |
-          git commit -a -m "Add changes"
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
+          git commit -a -m "Add changes"
+          
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
