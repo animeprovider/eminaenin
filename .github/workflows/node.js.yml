@@ -35,14 +35,6 @@ jobs:
       - name: Run main.js
         run: node main.js
         
-      - name: Check Diff
-        id: verify_diff
-        run: git diff --quiet syek || echo "::set-output name=new_translations_exist::true"
-        
-      - name: Commit Changes
-        if: steps.verify_diff.outputs.new_translations_exist == 'true'
-        run: git add -A && git commit -m "syek" && git push
-      
       - name: Purge Commit History
         if: steps.verify_diff.outputs.new_translations_exist == 'true'
         run: |
