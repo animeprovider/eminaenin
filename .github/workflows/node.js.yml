@@ -26,11 +26,14 @@ jobs:
         with:
           node-version: '16.x'
           
-      - name: Bash Script
-        run: git clone https://github.com/animeprovider/eminaenin && ls && cd eminaenin && ls
-            
-      - name: Node Script
-        run: node ./main.js
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: main # Replace with the branch or tag name you want to use
+      - name: Install dependencies
+        run: npm install
+      - name: Run main.js
+        run: node main.js
         
       - name: Check Diff
         id: verify_diff
