@@ -27,8 +27,8 @@ jobs:
           node-version: '16.x'
           
       - name: Bash Script
-        run: git clone https://github.com/animeprovider/eminaenin \
-            cd eminaenin
+        run: git clone https://github.com/animeprovider/eminaenin;cd eminaenin
+            
             
       - name: Node Script
         run: node -e main.js
