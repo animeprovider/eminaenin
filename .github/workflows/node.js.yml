@@ -13,10 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
           
-      - name: Setup Git
-        
-        shell: bash
-      
       - name: Executing Scripts
         uses: actions/setup-node@v3
         with:
